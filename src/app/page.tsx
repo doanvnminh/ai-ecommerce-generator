@@ -1,65 +1,148 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
 
 export default function Home() {
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageBase64, setImageBase64] = useState<string>("");
+  const [keywords, setKeywords] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
+  const [results, setResults] = useState<any>(null);
+  const [error, setError] = useState<string>("");
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  // Helper function to convert the image to Base64
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        // Strip the data URL prefix so we just send the raw base64 string
+        const base64String = (reader.result as string).split(",")[1];
+        setImageBase64(base64String);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleGenerate = async () => {
+    if (!imageBase64) {
+      setError("Hãy tải lên một hình ảnh sản phẩm.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setResults(null);
+
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64, keywords }),
+      });
+
+      if (!response.ok) throw new Error("Failed to generate content");
+
+      const data = await response.json();
+      setResults(data);
+    } catch (err) {
+      setError("Đã xảy ra lỗi. Vui lòng thử lại.");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper to copy text to clipboard
+  const copyToClipboard = (text: string, index: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(index);
+
+    // Reset back to "Copy" after 2 seconds
+    setTimeout(() => {
+      setCopiedIndex(null);
+    }, 2000);
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-gray-50 p-8 font-sans text-gray-900">
+      <div className="max-w-2xl mx-auto space-y-8">
+
+        {/* Header */}
+        <div className="text-center space-y-2">
+          <h1 className="text-3xl font-bold">Công Cụ Viết Content Bán Hàng AI</h1>
+          <p className="text-gray-500">Tải ảnh sản phẩm lên để tạo ngay tiêu đề chuẩn SEO, bài đăng và hashtag.</p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        {/* Input Form */}
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Hình Ảnh Sản Phẩm</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleImageChange}
+              className="w-full text-sm border p-2 rounded cursor-pointer"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Từ Khóa (Tùy chọn)</label>
+            <input
+              type="text"
+              placeholder="VD: Váy mùa hè, họa tiết hoa, vintage"
+              value={keywords}
+              onChange={(e) => setKeywords(e.target.value)}
+              className="w-full border p-2 rounded text-sm"
+            />
+          </div>
+
+          <button
+            onClick={handleGenerate}
+            disabled={loading}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition disabled:bg-gray-400"
           >
-            Documentation
-          </a>
+            {loading ? "Đang tạo..." : "Tạo Content"}
+          </button>
+
+          {error && <p className="text-red-500 text-sm text-center">{error}</p>}
         </div>
-      </main>
+
+        {/* Results Section */}
+        {results && (
+          <div className="space-y-4">
+            <h2 className="text-xl font-bold border-b pb-2">Kết Quả Đã Tạo</h2>
+
+            {/* Map through the results to create boxes */}
+            {[
+              { label: "Shopee Title", value: results.shopeeTitle },
+              { label: "Product Description", value: results.productDescription },
+              { label: "Facebook Caption", value: results.facebookCaption },
+              { label: "TikTok Caption", value: results.tikTokCaption },
+              { label: "Hashtags", value: results.hashtags },
+            ].map((item, index) => (
+              <div key={index} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="font-semibold text-sm text-gray-700">{item.label}</h3>
+                  <button
+                    onClick={() => copyToClipboard(item.value, index)}
+                    className={`text-xs px-2 py-1 rounded transition-colors ${copiedIndex === index
+                      ? "bg-green-100 text-green-700"
+                      : "bg-gray-100 hover:bg-gray-200 text-gray-600"
+                      }`}
+                  >
+                    {copiedIndex === index ? "Đã copy!" : "Copy"}
+                  </button>
+                </div>
+                <p className="text-sm whitespace-pre-wrap">{item.value}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+      </div>
     </div>
   );
 }
